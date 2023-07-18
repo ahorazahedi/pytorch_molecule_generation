@@ -2,7 +2,7 @@
 from collections import namedtuple 
 import pprint
 
-
+import torch
 import numpy as np
 from rdkit.Chem.rdchem import BondType
  
@@ -196,6 +196,7 @@ def collect_global_constants(parameters):
         "dim_f_add_p1": dim_f_add_p1,
         "dim_f_conn_p0": dim_f_conn_p0,
         "dim_f_conn_p1": dim_f_conn_p1,
+        "device" : torch.device("cpu")
     }
     
 

@@ -13,8 +13,11 @@ from Preprocessing import create_HDF_file
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
-
+from Generator import DrugGeneration
 import os
+
+
+from util import write_molecules
 
 
 class Drug():
@@ -82,17 +85,16 @@ class Drug():
             print("Optimizer Weights Saved")
 
     def load(self, load_optimizer=True):
-        
-        
+
         self.model.load_state_dict(torch.load(os.path.join(
             self.model_save_path, self.model_name+".pt")))
-        
+
         print("Model Weights Loaded")
-        
+
         if load_optimizer:
             self.optimizer.load_state_dict(torch.load(os.path.join(
                 self.model_save_path, self.model_name+"_optimizer.pt")))
-            
+
             print("Optimizer Weights Loaded")
 
     def log(self, key, value):
@@ -140,18 +142,18 @@ class Drug():
     def create_dataloader(self, h5_path, is_train=True):
         dataset = HDFDataset(h5_path)
 
-        dataloader = torch.utils.data.DataLoader(dataset,
-                                                 batch_size=self.batch_size,
-
-                                                 shuffle=is_train,
-                                                 )
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=is_train,)
+        
         return dataloader
 
     def create_model_and_optimizer(self):
 
         self.model = create_model()
         if self.checkpoint_path != None:
+            
             print("Loading Model Checkpoint Weights")
+            
             self.model.load_state_dict(torch.load(self.checkpoint_path))
 
         self.optimizer = Adam(self.model.parameters(), lr=self.learning_rate)
@@ -244,12 +246,40 @@ class Drug():
         self.log("TrainLoss", epoch_loss)
         return epoch_loss
 
-    def generate(self):
-        #Create model And Load Last Time Saved Weights To Model
+    def generate(self, n_samples):
+        # Create model And Load Last Time Saved Weights To Model
         self.create_model_and_optimizer()
         self.load()
-        
-        
+
+        generation_batch_size = min(self.batch_size, n_samples)
+
+        n_generation_batches = int(n_samples/generation_batch_size)
+
+        generator = DrugGeneration(model=self.model,
+                                   batch_size=generation_batch_size)
+        # generate graphs in batches
+
+        generated_graphs = []
+        generated_action_likehoods = []
+        generated_final_loglikelihood = []
+        generated_termination = []
+
+        for idx in range(0, n_generation_batches + 1):
+            # generate one batch of graphs
+            (graphs, action_likelihoods, final_loglikelihoods,
+             termination) = generator.sample()
+
+            generated_graphs.extend(graphs)
+            generated_action_likehoods.extend(action_likelihoods)
+            generated_final_loglikelihood.extend(final_loglikelihoods)
+            generated_termination.extend(termination)
+
+        fraction_valid, validity, uniqueness = write_molecules(
+            molecules=generated_graphs[:n_samples],
+            name="Ahora",
+
+        )
+
 
 if __name__ == "__main__":
     drug = Drug()
@@ -258,8 +288,8 @@ if __name__ == "__main__":
     # drug.create_model_and_optimizer()
     # drug.load()
     # drug.train_model()
-    
-    drug.generate()
+
+    drug.generate(n_samples=10)
 
     # drug.save()
 
