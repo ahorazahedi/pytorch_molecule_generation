@@ -201,16 +201,31 @@ def collect_global_constants(parameters):
     
 
     constants_dict.update(parameters)
-
+    
+    
     Constants = namedtuple("CONSTANTS", sorted(constants_dict))
     constants = Constants(**constants_dict)
     
+    
+    del constants_dict["bondtype_to_int"]
+    del constants_dict["int_to_bondtype"]
+    
+    
+    from tabulate import tabulate
+    table_data = [(key, value) for key, value in constants_dict.items()]
+    table = tabulate(table_data, headers=["Key", "Value"], tablefmt="fancy_grid")
+    print(table)
+
     return constants
 
 Default_Parameters = {**Molecular_Parameters , **Model_Parameters , **Learning_Parameters}
 
 Parameters = collect_global_constants(parameters=Default_Parameters,
                                      )
-if __name__ == "__main__":
-        pprint.pprint(dict(Parameters._asdict()))
+# if __name__ == "__main__":
+    # from tabulate import tabulate
+    # table_data = [(key, value) for key, value in Parameters.items()]
+    # table = tabulate(table_data, headers=["Key", "Value"], tablefmt="fancy_grid")
+    # print(table)
+
     

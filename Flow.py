@@ -43,7 +43,7 @@ class Drug():
         self.restart_epoch = None
 
         # hyper parameters
-        self.batch_size = 64
+        self.batch_size = 7
         self.dataloader_workers_count = 2
 
         self.learning_rate = 3e-4
@@ -256,7 +256,7 @@ class Drug():
         n_generation_batches = int(n_samples/generation_batch_size)
 
         generator = DrugGeneration(model=self.model,
-                                   batch_size=generation_batch_size)
+                                   batch_size=6)
         # generate graphs in batches
 
         generated_graphs = []

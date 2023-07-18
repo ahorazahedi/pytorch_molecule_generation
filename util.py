@@ -13,38 +13,67 @@ from rdkit.Chem import MolToSmiles
 
 
 def reshape_action_prediction(apds, batch_size):
+    
+    """
+        This Function get Model Output and Split Each Action For Each item In Batch size
+    """
 
     # get shapes of "add" and "connect" actions
     f_add_shape = (batch_size, *Parameters.dim_f_add)
     f_conn_shape = (batch_size, *Parameters.dim_f_conn)
 
+    # dim_f_add   [13, 5, 3, 4]   max_n_nodes , n_atom_types , n_formal_charge , n_edge_features,            
+    # dim_f_conn  [13, 4] max_n_nodes , n_edge_feature    
+
+    
     # get len of flattened segment of APD corresponding to "add" action
     f_add_size = np.prod(Parameters.dim_f_add)
 
-    # reshape the various APD components
+
+    # split apd from model output
+    # reshape the various APD components  
     f_add = torch.reshape(apds[:, :f_add_size], f_add_shape)
     f_conn = torch.reshape(apds[:, f_add_size:-1], f_conn_shape)
     f_term = apds[:, -1]
-
+    
+    # f_add   [6,13, 5, 3, 4]   batch_size , max_n_nodes , n_atom_types , n_formal_charge , n_edge_features,            
+    # f_conn  [6,13, 4] batch_size ,max_n_nodes , n_edge_feature  
+    # f_term  [6,1]     batch_size , 1
+    
+   
     return f_add, f_conn, f_term
 
 
-def sample_action_prediction(apds, batch_size):
+def sample_from_apd_distribution(apds, batch_size):
 
-    action_probability_distribution = torch.distributions.Multinomial(
-        1,
-        probs=apds
-    )
+    # Creating a Multinomial distribution object, which is used to model the probability of counts of different outcomes.
+    # Here, the distribution is parameterized by the softmax output 'apds'. 
+    # The shape of 'apds' is expected to be [batch_size, prod(add), prod(conn), prod(terminae)].
+    action_probability_distribution = torch.distributions.Multinomial(1, probs=apds)
+
+    # Drawing a sample from the action_probability_distribution.
+    # The result is a one-hot tensor 'apd_one_hot' with the same shape as 'apds'.
     apd_one_hot = action_probability_distribution.sample()
+
+    # Reshaping 'apd_one_hot' into three separate tensors: 'f_add', 'f_conn', and 'f_term',
+    # each representing a different potential action.
     f_add, f_conn, f_term = reshape_action_prediction(apd_one_hot, batch_size)
 
-    likelihoods = apds[apd_one_hot == 1]
+    # Extracting the probabilities of the actions represented by 'apd_one_hot' from the softmax output 'apds'.
+    # The resulting tensor 'likelihoods' represents the likelihood of each action, and its shape is [batch_size].
+    likelihoods = apds[apd_one_hot == 1]    
 
-    add_idc = torch.nonzero(f_add, as_tuple=True)
-    conn_idc = torch.nonzero(f_conn, as_tuple=True)
-    term_idc = torch.nonzero(f_term).view(-1)
+    # Finding the indices of the non-zero elements in 'f_add', 'f_conn', and 'f_term'.
+    # These indices correspond to the actions predicted by the model.
+    # The 'as_tuple=True' argument changes the output to a tuple of 1D tensors, 
+    # which is more convenient for indexing multi-dimensional tensors.
+    add_indicies = torch.nonzero(f_add , as_tuple=True) 
+    conn_indicies = torch.nonzero(f_conn, as_tuple=True)
 
-    return add_idc, conn_idc, term_idc, likelihoods
+    # The '.view(-1)' operation reshapes the output of 'torch.nonzero(f_term)' into a 1D tensor.
+    term_indicies = torch.nonzero(f_term).view(-1)
+
+    return add_indicies, conn_indicies, term_indicies, likelihoods
 
 
 def convert_graph_to_molecule(node_features,
