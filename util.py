@@ -3,7 +3,7 @@ import csv
 import numpy as np
 import torch
 import rdkit
-# from tensorboard_writer import writer as tb_writer
+
 
 # load program-specific functions
 from Parameters import Parameters as C
