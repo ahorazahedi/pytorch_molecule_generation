@@ -86,7 +86,7 @@ def convert_graph_to_molecule(node_features,
 
     # add atoms to editable mol object
     for node_idx in range(n_nodes):
-        atom_to_add = convert_features_to_atom(node_idx, node_features)
+        atom_to_add = convert_node_to_atom_type_based_on_features(node_idx, node_features)
         molecule_idx = molecule.AddAtom(atom_to_add)
         node_to_idx[node_idx] = molecule_idx
 
@@ -121,7 +121,7 @@ def convert_graph_to_molecule(node_features,
     return molecule
 
 
-def convert_features_to_atom(node_idx, node_features):
+def convert_node_to_atom_type_based_on_features(node_idx, node_features):
 
     # get all the nonzero indices in the specified node feature vector
     nonzero_idc = torch.nonzero(node_features[node_idx])
@@ -192,8 +192,6 @@ def write_graphs_to_smi(smi_filename,molecular_graphs_list):
     smiles = []
 
     with open(smi_filename, "w") as smi_file:
-
-         
         smi_writer = rdkit.Chem.rdmolfiles.SmilesWriter(smi_file)
 
         for idx, molecular_graph in enumerate(molecular_graphs_list):
@@ -202,9 +200,7 @@ def write_graphs_to_smi(smi_filename,molecular_graphs_list):
             try:
                 mol.UpdatePropertyCache(strict=False)
                 rdkit.Chem.SanitizeMol(mol)
-
                 smi_writer.write(mol)
-
                 current_smiles = MolToSmiles(mol)
                 validity_tensor[idx] = 1
                 if current_smiles in smiles:

@@ -10,7 +10,7 @@ from pprint import pprint
 from Parameters import Parameters
 from MolecularGraph import GenerationGraph
 from tabulate import tabulate
-from util import reshape_action_prediction, convert_features_to_atom, sample_from_apd_distribution, convert_graph_to_molecule
+from util import reshape_action_prediction, convert_node_to_atom_type_based_on_features, sample_from_apd_distribution, convert_graph_to_molecule
 
 
 class DrugGeneration:
@@ -66,10 +66,9 @@ class DrugGeneration:
         # Keep generating graphs until we reach the desired batch size
         while number_of_generated_molecules < self.batch_size:
 
-            
             # Use the model to predict APDs for the current batch of graphs
             model_output = self.model(self.nodes, self.edges)
-            
+
             # Convert model output to probability distribution using softmax
             apd = softmax_function(model_output)
 
@@ -85,7 +84,8 @@ class DrugGeneration:
             """
 
             # Sample actions for each graph using the predicted APD
-            add_new_atom, connect_node, terminate, invalid, likelihoods_for_this_round = self.get_actions(apd)
+            add_new_atom, connect_existing_nodes_in_graph, terminate, invalid, likelihoods_for_this_round = self.get_actions(
+                apd)
 
             # Mark the structures that have been properly terminated
             # indicate (with a 1) the structures which have been properly terminated
@@ -110,7 +110,7 @@ class DrugGeneration:
             # apply actions to all graphs (note: applies dummy actions to
             # terminated graphs, since output will be reset anyways)
             self.apply_actions(add_new_atom,
-                               connect_node,
+                               connect_existing_nodes_in_graph,
                                generation_round,
                                likelihoods_for_this_round)
 
@@ -166,103 +166,114 @@ class DrugGeneration:
                                                dtype=torch.int8,
                                                device=self.device)
 
-    def apply_actions(self, add, conn, generation_round, likelihoods_sampled):
+    
 
-        def add_new_node(add, generation_round, likelihoods_sampled):
-            add = [idx.long() for idx in add]
+    def add_new_node_to_graph(self , add, generation_round, likelihoods_sampled):
+        """
+        
+        Here's a step by step breakdown of what the function does:
+        
+        1   -  The add action list is converted into long data type. This list seems to hold the necessary parameters to add a new node (or atom) and a bond in the graph.
+        2   -  Node characteristics such as atom types, formal charge, implicit hydrogen, and chirality are prepared.
+        3   -  Depending on the configuration parameters, different elements from the add list are used to set the features of the new node. It sets the correct bits for the atom type, formal charge, and possibly implicit hydrogens and chirality in the nodes tensor. The nodes tensor is a 3D tensor where the first dimension corresponds to each graph in the batch, the second dimension corresponds to each node in a graph, and the third dimension corresponds to the features of a node. Setting a specific bit to 1 indicates that the node has that specific feature.
+        4   -  After the node features are set, the function creates a mask to prevent dummy edges (self-loops) when adding a node to an empty graph. This is done by selecting only the elements of the batch where the number of nodes is not zero.
+        5   -  The new node is then connected to the existing graph by setting the appropriate bits in the edges tensor. The edges tensor is a 4D tensor where the first dimension corresponds to each graph in the batch, the second and third dimensions correspond to each edge in a graph (from one node to another), and the fourth dimension corresponds to the features of an edge. Setting a specific bit to 1 indicates that there is a bond of a specific type between the nodes.
+        6   -  The count of nodes is updated to include the newly added node.
+        7   -  The function also seems to calculate and store the negative log-likelihood (NLL) of the "add" action for the current generation round. This is typically used when training generative models to measure how well the model's predictions (probability distributions over possible next actions) match the actual actions taken.
+        
+        """
 
-            n_node_features = [Parameters.n_atom_types,
-                               Parameters.n_formal_charge,
-                               Parameters.n_imp_H,
-                               Parameters.n_chirality]
+        add = [idx.long() for idx in add]
 
-            if not Parameters.use_explicit_H and not Parameters.ignore_H:
-                if Parameters.use_chirality:
-                    (batch, bond_to, atom_type, charge,
-                     imp_h, chirality, bond_type, bond_from) = add
+        n_node_features = [Parameters.n_atom_types,
+                            Parameters.n_formal_charge,
+                            Parameters.n_imp_H,
+                            Parameters.n_chirality]
 
-                    # add the new nodes to the node features tensors
-                    self.nodes[batch, bond_from, atom_type] = 1
-                    self.nodes[batch, bond_from,
-                               charge + n_node_features[0]] = 1
-                    self.nodes[batch, bond_from, imp_h +
-                               sum(n_node_features[0:2])] = 1
-                    self.nodes[batch, bond_from, chirality +
-                               sum(n_node_features[0:3])] = 1
-                else:
-                    (batch, bond_to, atom_type, charge,
-                     imp_h, bond_type, bond_from) = add
-
-                    # add the new nodes to the node features tensors
-                    self.nodes[batch, bond_from, atom_type] = 1
-                    self.nodes[batch, bond_from,
-                               charge + n_node_features[0]] = 1
-                    self.nodes[batch, bond_from, imp_h +
-                               sum(n_node_features[0:2])] = 1
-            elif Parameters.use_chirality:
-                (batch, bond_to, atom_type, charge,
-                 chirality, bond_type, bond_from) = add
+        if not Parameters.use_explicit_H and not Parameters.ignore_H:
+            if Parameters.use_chirality:
+                (batch, bond_to_atom, atom_type, charge,
+                    imp_h, chirality, bond_type, bond_from_atom) = add
 
                 # add the new nodes to the node features tensors
-                self.nodes[batch, bond_from, atom_type] = 1
-                self.nodes[batch, bond_from, charge + n_node_features[0]] = 1
-                self.nodes[batch, bond_from, chirality +
-                           sum(n_node_features[0:2])] = 1
+                self.nodes[batch, bond_from_atom, atom_type] = 1
+                self.nodes[batch, bond_from_atom,
+                            charge + n_node_features[0]] = 1
+                self.nodes[batch, bond_from_atom, imp_h +
+                            sum(n_node_features[0:2])] = 1
+                self.nodes[batch, bond_from_atom, chirality +
+                            sum(n_node_features[0:3])] = 1
             else:
-                (batch, bond_to, atom_type, charge,
-                 bond_type, bond_from) = add
+                (batch, bond_to_atom, atom_type, charge,
+                    imp_h, bond_type, bond_from_atom) = add
 
                 # add the new nodes to the node features tensors
-                self.nodes[batch, bond_from, atom_type] = 1
-                self.nodes[batch, bond_from, charge + n_node_features[0]] = 1
+                self.nodes[batch, bond_from_atom, atom_type] = 1
+                self.nodes[batch, bond_from_atom,
+                            charge + n_node_features[0]] = 1
+                self.nodes[batch, bond_from_atom, imp_h +
+                            sum(n_node_features[0:2])] = 1
+        elif Parameters.use_chirality:
+            (batch, bond_to_atom, atom_type, charge,
+                chirality, bond_type, bond_from_atom) = add
 
-            # mask dummy edges (self-loops) introduced from adding node to empty graph
-            batch_masked = batch[torch.nonzero(self.n_nodes[batch] != 0)]
-            bond_to_masked = bond_to[torch.nonzero(self.n_nodes[batch] != 0)]
-            bond_from_masked = bond_from[torch.nonzero(
-                self.n_nodes[batch] != 0)]
-            bond_type_masked = bond_type[torch.nonzero(
-                self.n_nodes[batch] != 0)]
+            # add the new nodes to the node features tensors
+            self.nodes[batch, bond_from_atom, atom_type] = 1
+            self.nodes[batch, bond_from_atom, charge + n_node_features[0]] = 1
+            self.nodes[batch, bond_from_atom, chirality +
+                        sum(n_node_features[0:2])] = 1
+        else:
+            (batch, bond_to_atom, atom_type, charge,
+                bond_type, bond_from_atom) = add
 
-            # connect newly added nodes to the graphs
-            self.edges[batch_masked, bond_to_masked,
-                       bond_from_masked, bond_type_masked] = 1
-            self.edges[batch_masked, bond_from_masked,
-                       bond_to_masked, bond_type_masked] = 1
+            # add the new nodes to the node features tensors
+            self.nodes[batch, bond_from_atom, atom_type] = 1
+            self.nodes[batch, bond_from_atom, charge + n_node_features[0]] = 1
 
-            # keep track of the newly added node
-            self.n_nodes[batch] += 1
+        # mask dummy edges (self-loops) introduced from adding node to empty graph
+        batch_masked = batch[torch.nonzero(self.n_nodes[batch] != 0)]
+        bond_to_atom_masked = bond_to_atom[torch.nonzero(self.n_nodes[batch] != 0)]
+        bond_from_atom_masked = bond_from_atom[torch.nonzero(
+            self.n_nodes[batch] != 0)]
+        bond_type_masked = bond_type[torch.nonzero(
+            self.n_nodes[batch] != 0)]
 
-            # include the NLLs for the add actions for this generation round
-            self.likelihoods[batch,
-                             generation_round] = likelihoods_sampled[batch]
+        # connect newly added nodes to the graphs
+        self.edges[batch_masked, bond_to_atom_masked,
+                    bond_from_atom_masked, bond_type_masked] = 1
+        self.edges[batch_masked, bond_from_atom_masked,
+                    bond_to_atom_masked, bond_type_masked] = 1
 
-        def connect_node(conn, generation_round,
-                         likelihoods_sampled):
+        # keep track of the newly added node
+        self.n_nodes[batch] += 1
 
-            # get the action indices
-            conn = [idx.long() for idx in conn]
-            batch, bond_to, bond_type, bond_from = conn
+        # include the NLLs for the add actions for this generation round
+        self.likelihoods[batch,
+                            generation_round] = likelihoods_sampled[batch]
 
-            # apply the connect actions
-            self.edges[batch, bond_from, bond_to, bond_type] = 1
-            self.edges[batch, bond_to, bond_from, bond_type] = 1
+    def connect_existing_nodes_in_graph(self ,conn, generation_round,
+                        likelihoods_sampled):
 
-            # include the NLLs for the connect actions for this generation round
-            self.likelihoods[batch,
-                             generation_round] = likelihoods_sampled[batch]
+        # get the action indices
+        conn = [idx.long() for idx in conn]
+        batch, bond_to_atom, bond_type, bond_from_atom = conn
 
-        # first applies the "add" action to all graphs in batch (note: does
-        # nothing if a graph did not sample "add")
-        add_new_node(add, generation_round, likelihoods_sampled)
+        # apply the connect actions
+        self.edges[batch, bond_from_atom, bond_to_atom, bond_type] = 1
+        self.edges[batch, bond_to_atom, bond_from_atom, bond_type] = 1
 
-        # then applies the "connect" action to all graphs in batch (note: does
-        # nothing if a graph did not sample "connect")
-        connect_node(conn, generation_round, likelihoods_sampled)
+        # include the NLLs for the connect actions for this generation round
+        self.likelihoods[batch,
+                            generation_round] = likelihoods_sampled[batch]
+
+    def apply_actions(self, add, conn, generation_round, likelihoods_sampled): 
+        self.add_new_node_to_graph(add, generation_round, likelihoods_sampled)
+        self.connect_existing_nodes_in_graph(conn, generation_round, likelihoods_sampled)
 
     def copy_finalized_graphs_to_generated_graphs(self, indices_to_terminate, total_generated_graphs, current_round, sampled_likelihoods):
         # Record the likelihoods of the graphs to be terminated
-        self.likelihoods[indices_to_terminate, current_round] = sampled_likelihoods[indices_to_terminate]
+        self.likelihoods[indices_to_terminate,
+                         current_round] = sampled_likelihoods[indices_to_terminate]
 
         # Number of graphs that will be terminated in this round
         num_terminated_graphs = len(indices_to_terminate)
@@ -333,11 +344,7 @@ class DrugGeneration:
                                                 dtype=torch.float32,
                                                 device=self.device)
 
-        # create a dummy non-empty graph
-        self.nodes[0] = torch.ones(([1] + Parameters.dim_nodes),
-                                   device=self.device)
-        self.edges[0, 0, 0, 0] = 1
-        self.n_nodes[0] = 1
+        self.add_one_to_init_graph()
 
     def get_actions(self, apds):
         # Use the softmax output 'apds' to sample actions for each graph in the batch.

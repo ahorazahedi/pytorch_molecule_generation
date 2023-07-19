@@ -10,13 +10,11 @@ class HDFDataset(torch.utils.data.Dataset):
         self.path = path
 
         hdf_file = h5py.File(self.path, "r+", swmr=True)
-
    
         self.nodes = hdf_file.get("nodes")
         self.edges = hdf_file.get("edges")
         self.apds = hdf_file.get("APDs")
 
-   
         self.n_subgraphs = self.nodes.shape[0]
 
     def __getitem__(self, idx):

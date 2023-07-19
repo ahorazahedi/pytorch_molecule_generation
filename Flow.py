@@ -289,7 +289,7 @@ if __name__ == "__main__":
     # drug.load()
     # drug.train_model()
 
-    drug.generate(n_samples=10)
+    drug.generate(n_samples=1)
 
     # drug.save()
 
