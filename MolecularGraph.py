@@ -4,7 +4,7 @@ import torch
 import random
 import rdkit
 from rdkit.Chem.rdmolfiles import MolToSmiles
-from Parameters import Parameters as C
+from parameters import Parameters as C
 
 
 def get_feature_vector_indices():

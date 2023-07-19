@@ -6,9 +6,9 @@ import rdkit
 
 
 # load program-specific functions
-from Parameters import Parameters as C
+from parameters import Parameters as C
 from typing import Tuple
-from Parameters import Parameters
+from parameters import Parameters
 from rdkit.Chem import MolToSmiles
 
 

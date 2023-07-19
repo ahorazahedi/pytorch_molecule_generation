@@ -1,24 +1,23 @@
-from collections import namedtuple
-import pickle
-from copy import deepcopy
-import time
 import os
-from typing import Union, Tuple
-import torch
+import pickle
+import time
+from copy import deepcopy
 from tqdm import tqdm
-from DataLoaders import HDFDataset
+from typing import Union, Tuple
+from collections import namedtuple
 
-from Model import create_model
-from Preprocessing import create_HDF_file
+import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
-from Generator import DrugGeneration
-import os
 
-
+from preprocessing import create_HDF_file
+from model import create_model
+from generator import DrugGeneration
+from dataloader import HDFDataset
 from util import write_molecules
 
+from parameters import Parameters
 
 class Drug():
 
@@ -31,9 +30,9 @@ class Drug():
 
         self.checkpoint_path = None
 
-        self.test_smi_path = './test.smi'
-        self.train_smi_path = './train.smi'
-        self.valid_smi_path = 'validation.smi'
+        self.train_smi_path = './data/train.smi'
+        self.valid_smi_path = './data/validation.smi'
+        self.test_smi_path = './data/test.smi'
 
         # general paramters
         self.optimizer = None
@@ -56,6 +55,8 @@ class Drug():
         self.likelihood_per_action = None
 
         self.lr_scheduler = None
+        self.current_lr = 0
+        
         # Helper Constants
 
         self.start_epoch = 0
@@ -64,7 +65,7 @@ class Drug():
 
         self.gradient_accumulation_steps = 1
 
-        self.device = torch.device("cpu")
+        self.device = Parameters.device
 
         self.loss_logsoftmax = torch.nn.LogSoftmax(dim=1)
         self.loss_kldiverence = torch.nn.KLDivLoss(reduction="batchmean")
@@ -72,8 +73,17 @@ class Drug():
         self.tb_writer = SummaryWriter()
 
         self.model_name = "test_debug"
-        self.model_save_path = './'
+        self.model_save_path = './model_saves'
 
+
+    def write_train_log(self , training_loss , validation_loss ,lr , epoch):
+        self.tb_writer.add_scalar("Training/training_loss", training_loss, epoch)
+        self.tb_writer.add_scalar("Training/validation_loss", validation_loss, epoch)
+        self.tb_writer.add_scalar("Training/lr", lr, epoch)
+        
+    def write_evaluation_log(self):
+        pass
+    
     def save(self, save_model=True, save_optimizer=False):
         if save_model:
             torch.save(self.model.state_dict(), os.path.join(
@@ -148,25 +158,23 @@ class Drug():
         return dataloader
 
     def create_model_and_optimizer(self):
-
         self.model = create_model()
+        
         if self.checkpoint_path != None:
-            
             print("Loading Model Checkpoint Weights")
-            
             self.model.load_state_dict(torch.load(self.checkpoint_path))
-
+            
         self.optimizer = Adam(self.model.parameters(), lr=self.learning_rate)
 
     def train_model(self):
-
         for epoch in range(self.start_epoch, self.end_epoch):
             self.current_epoch = epoch
             print(f"Start Training Epoch number {epoch}")
             training_loss = self.run_one_train_epoch()
-
-            print(training_loss.item())
-
+            validation_loss = self.run_one_validation_epoch()
+            
+            self.write_train_log(training_loss=training_loss ,validation_loss=validation_loss , lr=self.current_lr , epoch=epoch )
+            
     def calculate_loss(self, model_output, target_output):
 
         model_output = self.loss_logsoftmax(model_output)
@@ -195,7 +203,7 @@ class Drug():
                 validation_loss_tensor[batch_index] = step_loss
 
         validation_epoch_loss = torch.mean(validation_loss_tensor)
-        self.log("ValidationLoss", validation_epoch_loss)
+        
         return validation_epoch_loss
 
     def run_one_train_epoch(self):
@@ -243,7 +251,7 @@ class Drug():
             pbar.update(1)
 
         epoch_loss = torch.mean(train_loss_tensor)
-        self.log("TrainLoss", epoch_loss)
+        
         return epoch_loss
 
     def generate(self, n_samples):

@@ -1,31 +1,25 @@
 import torch
-from Parameters import Parameters as C
+from parameters import Parameters as C
 
 BIG_POSITIVE = C.big_positive
 
-TORCH_DEVICE = torch.device("cpu")
+TORCH_DEVICE = C.device
 
 class MLP(torch.nn.Module):
-  
+    
     def __init__(self, in_features, hidden_layer_sizes, out_features, init, dropout_p , activation_function = torch.nn.SELU):
-
         super(MLP, self).__init__()
-
+    
         fs = [in_features, *hidden_layer_sizes, out_features]
-   
         layers = [self.generate_block(input_linear, out_linear,
                                      activation_function, init,
                                      dropout_p)
                   for input_linear, out_linear in zip(fs, fs[1:])]
-        
         layers = [module for sq in layers for module in sq.children()]
-
         self.sequence_of_layers = torch.nn.Sequential(*layers)
 
     def generate_block(self, in_f, out_f, activation, init, dropout_p):
-
         linear = torch.nn.Linear(in_f, out_f, bias=True)
-
         return torch.nn.Sequential(linear, activation(), torch.nn.AlphaDropout(dropout_p))
 
     def forward(self, input):
@@ -112,9 +106,9 @@ class GlobalReadout(torch.nn.Module):
         f_conn_2 = self.fConnNet2(torch.cat((f_conn_1, graph_embedding_batch), dim=1).unsqueeze(dim=1))
         f_term_2 = self.fTermNet2(graph_embedding_batch)
 
-        # f_add_2 = f_add_2.to(TORCH_DEVICE, non_blocking=True)
-        # f_conn_2 = f_conn_2.to(TORCH_DEVICE, non_blocking=True)
-        # f_term_2 = f_term_2.to(TORCH_DEVICE, non_blocking=True)
+        f_add_2 = f_add_2.to(TORCH_DEVICE)
+        f_conn_2 = f_conn_2.to(TORCH_DEVICE)
+        f_term_2 = f_term_2.to(TORCH_DEVICE)
 
         cat = torch.cat((f_add_2.squeeze(dim=1), f_conn_2.squeeze(dim=1), f_term_2), dim=1)
 

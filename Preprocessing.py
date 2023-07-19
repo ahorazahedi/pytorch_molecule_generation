@@ -8,9 +8,9 @@ import h5py
 from tqdm import tqdm
 
 
-from Parameters import Parameters as C
+from parameters import Parameters as C
 
-from MolecularGraph import PreprocessingGraph
+from molecularGraph import PreprocessingGraph
 
 def generate_decoding_states(molecular_graph, subgraph_idx):
 
