@@ -29,9 +29,6 @@ git clone https://github.com/ahorazahedi/pytorch_molecule_generation.git
 
 Navigate to the project directory:
 
-```sh
-cd projectname
-```
 
 Install the necessary packages:
 
