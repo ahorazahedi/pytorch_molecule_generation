@@ -9,7 +9,7 @@ from rdkit.Chem.rdchem import BondType
 
 Molecular_Parameters = {
     'use_aromatic_bonds' : True  , 
-    "atom_types": ["C", "N", "O", "S", "Cl"],
+    "atom_types": ["C", "N", "O", "S", "Cl" ,"F" , "Br"], #based on MOSES
     "formal_charge": [-1, 0, 1],
     "imp_H": [0, 1, 2, 3],
     "chirality": ["None", "R", "S"],
@@ -17,7 +17,7 @@ Molecular_Parameters = {
     "n_samples": 2000,  #5000,
     "n_workers": 2,
     "restart": False,
-    "max_n_nodes": 13,
+    "max_n_nodes": 27, #based on MOSES
     "job_type": "train",
     "sample_every": 10,
     

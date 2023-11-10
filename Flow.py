@@ -322,7 +322,7 @@ if __name__ == "__main__":
     drug = Drug()
 
     if args.preprocess:
-        drug.preprocess()
+        drug.preprocess_data()
 
     if args.train:
         drug.train_model()
