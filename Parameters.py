@@ -223,9 +223,9 @@ Default_Parameters = {**Molecular_Parameters , **Model_Parameters , **Learning_P
 Parameters = collect_global_constants(parameters=Default_Parameters,
                                      )
 # if __name__ == "__main__":
-    # from tabulate import tabulate
-    # table_data = [(key, value) for key, value in Parameters.items()]
-    # table = tabulate(table_data, headers=["Key", "Value"], tablefmt="fancy_grid")
-    # print(table)
+#     from tabulate import tabulate
+#     table_data = [(key, value) for key, value in Parameters.items()]
+#     table = tabulate(table_data, headers=["Key", "Value"], tablefmt="fancy_grid")
+#     print(table)
 
     

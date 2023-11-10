@@ -9,8 +9,8 @@ import rdkit
 
 import torch
 
-from parameters import Parameters
-from molecularGraph import GenerationGraph
+from Parameters import Parameters
+from MolecularGraph import GenerationGraph
 from util import reshape_action_prediction, convert_node_to_atom_type_based_on_features, sample_from_apd_distribution, convert_graph_to_molecule
 
 class DrugGeneration:
@@ -21,14 +21,14 @@ class DrugGeneration:
 
         self.device =Parameters.device
 
-        # initializes `self.nodes`, `self.edges`, and `self.n_nodes`, which are
+        # initializes self.nodes, self.edges, and self.n_nodes, which are
         # tensors for keeping track of the batch of graphs
         self.initialize_graph()
 
         # allocate tensors for finished graphs; these will get filled in gradually
-        # as graphs terminate: `self.generated_nodes`, `self.generated_edges`,
-        # `self.generated_n_nodes`, `self.generated_likelihoods`, and
-        # `self.properly_terminated`
+        # as graphs terminate: self.generated_nodes, self.generated_edges,
+        # self.generated_n_nodes, self.generated_likelihoods, and
+        # self.properly_terminated
         self.allocate_graph_tensors()
 
     def sample(self):

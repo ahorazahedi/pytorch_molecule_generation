@@ -4,7 +4,6 @@ from Parameters import Parameters as C
 BIG_POSITIVE = C.big_positive
 
 TORCH_DEVICE = C.device
-
 class MLP(torch.nn.Module):
     
     def __init__(self, in_features, hidden_layer_sizes, out_features, init, dropout_p , activation_function = torch.nn.SELU):
@@ -84,6 +83,8 @@ class GlobalReadout(torch.nn.Module):
 
     def forward(self, node_level_output, graph_embedding_batch):
 
+
+        print("node_level_output" , node_level_output.shape)
         self.fAddNet1 = self.fAddNet1.to(TORCH_DEVICE, non_blocking=True)
         self.fConnNet1 = self.fConnNet1.to(TORCH_DEVICE, non_blocking=True)
         self.fAddNet2 = self.fAddNet2.to(TORCH_DEVICE, non_blocking=True)
@@ -99,9 +100,14 @@ class GlobalReadout(torch.nn.Module):
     
         f_add_1_size = f_add_1.size()
         f_conn_1_size = f_conn_1.size()
+        
+        # print("f_add_1" ,f_add_1.shape)
         f_add_1 = f_add_1.view((f_add_1_size[0], f_add_1_size[1] * f_add_1_size[2]))
+        # print("f_add_1" ,f_add_1.shape)
+        
         f_conn_1 = f_conn_1.view((f_conn_1_size[0], f_conn_1_size[1] * f_conn_1_size[2]))
-
+        # print("graph_embedding_batch" , graph_embedding_batch.shape)
+        # print("f_2_add_input" , torch.cat((f_add_1, graph_embedding_batch), dim=1).unsqueeze(dim=1).shape)
         f_add_2 = self.fAddNet2(torch.cat((f_add_1, graph_embedding_batch), dim=1).unsqueeze(dim=1))
         f_conn_2 = self.fConnNet2(torch.cat((f_conn_1, graph_embedding_batch), dim=1).unsqueeze(dim=1))
         f_term_2 = self.fTermNet2(graph_embedding_batch)
@@ -142,7 +148,6 @@ class GraphGather(torch.nn.Module):
 
     def forward(self, hidden_nodes, input_nodes, node_mask):
 
-
         cat = torch.cat((hidden_nodes, input_nodes), dim=2)
         energy_mask = (node_mask == 0).float() * BIG_POSITIVE
         energies = self.att_nn(cat) - energy_mask.unsqueeze(-1)
@@ -156,6 +161,7 @@ class SummationMPNN(torch.nn.Module):
 
         super(SummationMPNN, self).__init__()
 
+        self.node_features = node_features
         self.hidden_node_features = hidden_node_features
         self.edge_features = edge_features
         self.message_size = message_size
@@ -176,7 +182,7 @@ class SummationMPNN(torch.nn.Module):
       # messages Shape [batch , number of node features]
         raise NotImplementedError
 
-    def readout(self, hidden_nodes, input_nodes, node_mask):
+    def graph_readout(self, hidden_nodes, input_nodes, node_mask):
 
         #Local readout function
         # hidden_nodes shape [batch , node_feat]
@@ -184,31 +190,42 @@ class SummationMPNN(torch.nn.Module):
         # node_mask shape [batch , node_feat]
         raise NotImplementedError
 
+
+    def apd_calc(self , graph_embedding , hidden_nodes ):
+    
+        raise NotImplemented
     def forward(self, nodes, edges):
    
         # nodes shape [number of subgraphs , node features , number of nodes]
         # edges shape [number of subgraphs , number_of_node , number_of_node number_of_edge_feat]
-        
-        adjacency = torch.sum(edges, dim=3)
 
+        adjacency = torch.sum(edges, dim=3)
+        
+        # This Line Create 3 tensor
+        # first one is like [0,0,0,0,1,1,1,1] indicate that each edge belongs to each item in this batch
+        #secound one is in item node id of src and third one is destination of that edge
+        #for example Node 1 is connected to node 2 in item batch of 1
+        
         (
             edge_batch_batch_idc,
             edge_batch_node_idc,
             edge_batch_nghb_idc,
         ) = adjacency.nonzero(as_tuple=True)
+    
 
         (node_batch_batch_idc, node_batch_node_idc) = adjacency.sum(-1).nonzero(as_tuple=True)
-
+        
         same_batch = node_batch_batch_idc.view(-1, 1) == edge_batch_batch_idc
         same_node = node_batch_node_idc.view(-1, 1) == edge_batch_node_idc
-
-
+        
         message_summation_matrix = (same_batch * same_node).float()
 
         edge_batch_edges = edges[edge_batch_batch_idc, edge_batch_node_idc, edge_batch_nghb_idc, :]
-
+        
         hidden_nodes = torch.zeros(nodes.shape[0], nodes.shape[1], self.hidden_node_features, device=TORCH_DEVICE)
+        
         hidden_nodes[:nodes.shape[0], :nodes.shape[1], :nodes.shape[2]] = nodes.clone()
+        
         node_batch_nodes = hidden_nodes[node_batch_batch_idc, node_batch_node_idc, :]
 
         for _ in range(self.message_passes):
@@ -227,12 +244,14 @@ class SummationMPNN(torch.nn.Module):
             messages = torch.matmul(message_summation_matrix, message_terms)
 
             node_batch_nodes = self.update(node_batch_nodes, messages)
+            
             hidden_nodes[node_batch_batch_idc, node_batch_node_idc, :] = node_batch_nodes.clone()
 
         node_mask = adjacency.sum(-1) != 0
 
-        output = self.readout(hidden_nodes, nodes, node_mask)
-
+        graph_embedding = self.graph_readout(hidden_nodes, nodes, node_mask)
+        
+        output = self.apd_calc(graph_embedding , hidden_nodes)
         return output
 
 
@@ -249,6 +268,7 @@ class GGNN(SummationMPNN):
         super(GGNN, self).__init__(node_features, hidden_node_features, edge_features, message_size, message_passes)
 
         self.n_nodes_largest_graph = n_nodes_largest_graph
+        
 
         self.msg_nns = torch.nn.ModuleList()
         for _ in range(edge_features):
@@ -296,23 +316,44 @@ class GGNN(SummationMPNN):
         )
 
     def message_terms(self, nodes, node_neighbours, edges):
+        
         edges_v = edges.view(-1, self.edge_features, 1)
+        
         node_neighbours_v = edges_v * node_neighbours.view(-1, 1, self.hidden_node_features)
+        
+        
         terms_masked_per_edge = [
             edges_v[:, i, :] * self.msg_nns[i](node_neighbours_v[:, i, :])
             for i in range(self.edge_features)
         ]
+        
         return sum(terms_masked_per_edge)
 
     def update(self, nodes, messages):
-        return self.gru(messages, nodes)
+        # Run This Function When Updating Node Embedding is Required
+        update_out = self.gru(messages, nodes)
+        
+        # print("Update messages "  , messages.shape)
+        # print("Update nodes"  , nodes.shape)
+        # print("Update update_out"  , update_out.shape)
+        
+        return update_out
 
-    def readout(self, hidden_nodes, input_nodes, node_mask):
+    def graph_readout(self, hidden_nodes, input_nodes, node_mask):
+        # This Message Run Once
+        # print("readout" ,  hidden_nodes.shape, input_nodes.shape, node_mask.shape)
         graph_embeddings = self.gather(hidden_nodes, input_nodes, node_mask)
-        output = self.APDReadout(hidden_nodes, graph_embeddings)
-
+        # print("readout graph_embeddings" ,graph_embeddings.shape)
+        # output = self.APDReadout(hidden_nodes, graph_embeddings)
+        output = graph_embeddings
+        # print("readout output" ,output.shape)
         return output
-
+    
+    def apd_calc(self, graph_embedding, hidden_nodes):
+        output = self.APDReadout(hidden_nodes, graph_embedding)
+        return output
+      
+        
 
 def create_model():
     net = GGNN(
@@ -345,8 +386,3 @@ def create_model():
     net = net.to(TORCH_DEVICE, non_blocking=True)
 
     return net
-
-
-# if __name__ == "__main__":
-#     model = create_model()
-#     print(model)

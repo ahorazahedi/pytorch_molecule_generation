@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 import time
@@ -11,13 +12,13 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
-from preprocessing import create_HDF_file
-from model import create_model
-from generator import DrugGeneration
+from Preprocessing import create_HDF_file
+from Model import create_model
+from Generator import DrugGeneration
 from dataloader import HDFDataset
 from util import write_molecules
 
-from parameters import Parameters
+from Parameters import Parameters
 
 class Drug():
 
@@ -110,6 +111,23 @@ class Drug():
     def log(self, key, value):
         self.tb_writer.add_scalar(key, value)
 
+    def preprocess_data(self):
+
+        # ===========Train==========
+        if not os.path.exists(self.train_smi_path[:-3] + "h5"):
+            print("Create Train HD5")
+            create_HDF_file(path=self.train_smi_path)
+
+        # =======Validation======
+        if not os.path.exists(self.valid_smi_path[:-3] + "h5"):
+            print("Create Validation HD5")
+            create_HDF_file(path=self.valid_smi_path)
+
+        # =======Test======
+        if os.path.exists(self.test_smi_path[:-3] + "h5"):
+            print("Create Test HD5")
+            create_HDF_file(path=self.test_smi_path)
+
     def load_data(self):
 
         # ===========Train==========
@@ -167,6 +185,8 @@ class Drug():
         self.optimizer = Adam(self.model.parameters(), lr=self.learning_rate)
 
     def train_model(self):
+        
+        self.load_data()
         for epoch in range(self.start_epoch, self.end_epoch):
             self.current_epoch = epoch
             print(f"Start Training Epoch number {epoch}")
@@ -290,15 +310,24 @@ class Drug():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Drug Generation and Training Script')
+    
+
+    parser.add_argument('--preprocess', action='store_true', help='Flag to preprocess the data')
+    parser.add_argument('--train', action='store_true', help='Flag to train the model')
+    parser.add_argument('--generate', action='store_true', help='Flag to generate samples')
+   
+    args = parser.parse_args()
+
     drug = Drug()
 
-    # drug.load_data()
-    # drug.create_model_and_optimizer()
-    # drug.load()
-    # drug.train_model()
+    if args.preprocess:
+        drug.preprocess()
 
-    drug.generate(n_samples=1)
+    if args.train:
+        drug.train_model()
 
-    # drug.save()
+    if args.generate:
+        drug.generate(n_samples=args.n_samples)
 
-    print("Done")
+    
