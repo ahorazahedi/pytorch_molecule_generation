@@ -11,8 +11,7 @@ import torch
 
 from Parameters import Parameters
 from Graphs.GenerationGraph import GenerationGraph
-from util import reshape_action_prediction, convert_node_to_atom_type_based_on_features, sample_from_apd_distribution, convert_graph_to_molecule
-
+from Utils import reshape_action_prediction , convert_node_to_atom_type_based_on_features , sample_from_apd_distribution , convert_graph_to_molecule
 class DrugGeneration:
     def __init__(self, model, batch_size):
 

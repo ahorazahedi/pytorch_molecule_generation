@@ -3,17 +3,20 @@ Contains various miscellaneous useful functions.
 """
 # load general packages and functions
 import csv
+
+import rdkit
+
 from collections import namedtuple
 from typing import Union, Tuple
 from warnings import filterwarnings
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
-from matplotlib import pyplot
 import matplotlib.pyplot as plt
+from rdkit.Chem.rdmolfiles import SmilesMolSupplier
 
 import torch
-import rdkit
+
 from rdkit import RDLogger
 from rdkit.Chem import MolToSmiles
 from torch.utils.tensorboard import SummaryWriter
@@ -26,6 +29,26 @@ from Parameters import Parameters as Parameters
 
 # defines the tensorboard writer
 tb_writer = SummaryWriter(log_dir=constants.tensorboard_dir, flush_secs=10)
+
+
+
+def molecules(path : str) -> rdkit.Chem.rdmolfiles.SmilesMolSupplier:
+    """
+    Reads a SMILES file (full path/filename specified by `path`) and returns
+    `rdkit.Mol` objects.
+    """
+    # check first line of SMILES file to see if contains header
+    with open(path) as smi_file:
+        first_line = smi_file.readline()
+        has_header = bool("SMILES" in first_line)
+    smi_file.close()
+
+    # read file
+    molecule_set = SmilesMolSupplier(path,
+                                     sanitize=True,
+                                     nameColumn=-1,
+                                     titleLine=has_header)
+    return molecule_set
 
 
 def get_feature_vector_indices() -> list:

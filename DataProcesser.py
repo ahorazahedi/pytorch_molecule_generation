@@ -22,11 +22,12 @@ import rdkit
 from Analyzer import Analyzer
 from Parameters import Parameters as constants
 from Parameters import Parameters as C
-import load_molecules as load
+
+from Utils import molecules as load_molecules
 
 from Graphs.PreprocessingGraph import  PreprocessingGraph
 
-import util_graph_invent as util
+import Utils as util
 
 
 def get_feature_vector_indices():
@@ -79,7 +80,7 @@ class DataProcesser:
         self.get_dataset_dims()  # creates `self.dims`
 
         # load the molecules
-        self.molecule_set = load.molecules(self.path)
+        self.molecule_set = load_molecules(self.path)
 
         # placeholders
         self.molecule_subset    = None

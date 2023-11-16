@@ -12,7 +12,7 @@ from Parameters import Parameters as C
 
 from Graphs.MolecularGraph import MolecularGraph
 
-import util_graph_invent as util
+import Utils as util
 
 class PreprocessingGraph(MolecularGraph):
     """

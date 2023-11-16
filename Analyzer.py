@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 # load GraphINVENT-specific functions
 from Parameters import Parameters as constants
-import util_graph_invent as util
+import Utils as util
 
 
 class Analyzer:

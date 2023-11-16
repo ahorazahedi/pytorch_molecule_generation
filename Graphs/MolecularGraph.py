@@ -22,15 +22,15 @@ import rdkit
 
 
 # load GraphINVENT-specific functions
-from Analyzer import Analyzer
-from Parameters import Parameters as constants
-from Parameters import Parameters as C
-import load_molecules as load
+# from Analyzer import Analyzer
+# from Parameters import Parameters as constants
+# from Parameters import Parameters as C
+# # import load_molecules as load
+# from Utils import molecules as load_molecules
 
+# import Utils as util
 
-import util_graph_invent as util
-
-from Graphs.utils import get_feature_vector_indices , one_of_k_encoding
+# from Graphs.utils import get_feature_vector_indices , one_of_k_encoding
 
 class MolecularGraph:
     """

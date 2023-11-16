@@ -22,7 +22,6 @@ python combine_HDFs.py
 """
 import numpy as np
 import h5py
-from typing import Union
 
 def get_dims() -> dict:
     """
