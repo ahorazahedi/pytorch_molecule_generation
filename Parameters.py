@@ -196,7 +196,11 @@ def collect_global_constants(parameters):
         "dim_f_add_p1": dim_f_add_p1,
         "dim_f_conn_p0": dim_f_conn_p0,
         "dim_f_conn_p1": dim_f_conn_p1,
-        "device" : torch.device("cuda")
+        "device" :torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")  , 
+        "tensorboard_dir" : "./tensorboard_dir" , 
+        'decoding_route' :"bfs"  , #dfs 
+        "dataset_dir" : "./data" , 
+        "training_set" : './data/train.smi' , 
     }
     
 
