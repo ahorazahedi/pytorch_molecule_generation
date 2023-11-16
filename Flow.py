@@ -174,7 +174,7 @@ class Drug():
         dataset = HDFDataset(h5_path)
 
         dataloader = BlockDataLoader(
-            dataset, batch_size=self.batch_size, shuffle=is_train,block_size=10000 , n_workers=10)
+            dataset, batch_size=self.batch_size, shuffle=is_train,block_size=10000 )
         
         return dataloader
 

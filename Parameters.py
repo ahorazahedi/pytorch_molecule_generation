@@ -15,7 +15,7 @@ Molecular_Parameters = {
     "chirality": ["None", "R", "S"],
     "generation_epoch": 30,
     "n_samples": 2000,  #5000,
-    "n_workers": 2,
+    "n_workers": 1,
     "restart": False,
     "max_n_nodes": 13, #based on MOSES
     "job_type": "train",
