@@ -24,7 +24,7 @@ from Parameters import Parameters as constants
 from Parameters import Parameters as C
 import load_molecules as load
 
-from PreprocessingGraph import  PreprocessingGraph
+from Graphs.PreprocessingGraph import  PreprocessingGraph
 
 import util_graph_invent as util
 

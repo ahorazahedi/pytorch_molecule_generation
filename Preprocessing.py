@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from Parameters import Parameters as C
 
-from MolecularGraph import PreprocessingGraph
+from Graphs.GenerationGraph import PreprocessingGraph
 
 def generate_decoding_states(molecular_graph, subgraph_idx):
 
