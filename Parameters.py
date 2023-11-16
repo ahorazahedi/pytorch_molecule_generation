@@ -8,8 +8,8 @@ from rdkit.Chem.rdchem import BondType
  
 
 Molecular_Parameters = {
-    'use_aromatic_bonds' : True  , 
-    "atom_types": ["C", "N", "O", "S", "Cl" ,"F" , "Br"], #based on MOSES
+    'use_aromatic_bonds' : False  , 
+    "atom_types": ["C", "N", "O", "S", "Cl" ], #based on MOSES
     "formal_charge": [-1, 0, 1],
     "imp_H": [0, 1, 2, 3],
     "chirality": ["None", "R", "S"],
@@ -17,7 +17,7 @@ Molecular_Parameters = {
     "n_samples": 2000,  #5000,
     "n_workers": 2,
     "restart": False,
-    "max_n_nodes": 27, #based on MOSES
+    "max_n_nodes": 13, #based on MOSES
     "job_type": "train",
     "sample_every": 10,
     
@@ -196,7 +196,7 @@ def collect_global_constants(parameters):
         "dim_f_add_p1": dim_f_add_p1,
         "dim_f_conn_p0": dim_f_conn_p0,
         "dim_f_conn_p1": dim_f_conn_p1,
-        "device" : torch.device("cpu")
+        "device" : torch.device("cuda")
     }
     
 
@@ -214,7 +214,7 @@ def collect_global_constants(parameters):
     from tabulate import tabulate
     table_data = [(key, value) for key, value in constants_dict.items()]
     table = tabulate(table_data, headers=["Key", "Value"], tablefmt="fancy_grid")
-    print(table)
+    # print(table)
 
     return constants
 

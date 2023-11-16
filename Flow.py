@@ -15,7 +15,8 @@ from torch.utils.tensorboard import SummaryWriter
 from Preprocessing import create_HDF_file
 from Model import create_model
 from Generator import DrugGeneration
-from dataloader import HDFDataset
+# from dataloader import HDFDataset
+from BlockDatasetLoader import *
 from util import write_molecules
 
 from Parameters import Parameters
@@ -43,7 +44,7 @@ class Drug():
         self.restart_epoch = None
 
         # hyper parameters
-        self.batch_size = 7
+        self.batch_size = 1000
         self.dataloader_workers_count = 2
 
         self.learning_rate = 3e-4
@@ -61,7 +62,7 @@ class Drug():
         # Helper Constants
 
         self.start_epoch = 0
-        self.end_epoch = 1
+        self.end_epoch = 100
         self.current_epoch = 0
 
         self.gradient_accumulation_steps = 1
@@ -131,47 +132,49 @@ class Drug():
     def load_data(self):
 
         # ===========Train==========
-        if os.path.exists(self.train_smi_path[:-3] + "h5"):
-            print("Train H5 Exist Just Load it")
-            self.train_h5_path = self.train_smi_path[:-3] + "h5"
-        else:
-            print("Create Training set h5 File")
-            self.train_h5_path = create_HDF_file(path=self.train_smi_path)
-
+        # if os.path.exists(self.train_smi_path[:-3] + "h5"):
+        #     print("Train H5 Exist Just Load it")
+        #     self.train_h5_path = self.train_smi_path[:-3] + "h5"
+        # else:
+        #     print("Create Training set h5 File")
+        #     self.train_h5_path = create_HDF_file(path=self.train_smi_path)
+        
+        self.train_h5_path = "./data/train.h5"
         print("Create Train DataLoader")
         self.train_dataloader = self.create_dataloader(
             self.train_h5_path, is_train=True)
 
         # =======Validation======
-        if os.path.exists(self.valid_smi_path[:-3] + "h5"):
-            print("Validation H5 Exist Just Load it")
-            self.valid_h5_path = self.valid_smi_path[:-3] + "h5"
-        else:
-            print("Create Validation set h5 File")
-            self.valid_h5_path = create_HDF_file(path=self.valid_smi_path)
+#         if os.path.exists(self.valid_smi_path[:-3] + "h5"):
+#             print("Validation H5 Exist Just Load it")
+#             self.valid_h5_path = self.valid_smi_path[:-3] + "h5"
+#         else:
+#             print("Create Validation set h5 File")
+#             self.valid_h5_path = create_HDF_file(path=self.valid_smi_path)
 
-        print("Create Validation DataLoader")
+#         print("Create Validation DataLoader")
+        self.valid_h5_path = "./data/valid.h5"
         self.valid_dataloader = self.create_dataloader(
             self.valid_h5_path, is_train=False)
 
         # =======Test Set======
-        if os.path.exists(self.test_smi_path[:-3] + "h5"):
-            print("Test H5 Exist Just Load it")
-            self.test_h5_path = self.test_smi_path[:-3] + "h5"
-        else:
-            print("Create Test set h5 File")
-            self.test_h5_path = create_HDF_file(path=self.test_smi_path)
+#         if os.path.exists(self.test_smi_path[:-3] + "h5"):
+#             print("Test H5 Exist Just Load it")
+#             self.test_h5_path = self.test_smi_path[:-3] + "h5"
+#         else:
+#             print("Create Test set h5 File")
+#             self.test_h5_path = create_HDF_file(path=self.test_smi_path)
 
-        print("Create Test DataLoader")
+#         print("Create Test DataLoader")
 
-        self.test_h5_path = self.create_dataloader(
-            self.test_h5_path, is_train=False)
+#         self.test_h5_path = self.create_dataloader(
+#             self.test_h5_path, is_train=False)
 
     def create_dataloader(self, h5_path, is_train=True):
         dataset = HDFDataset(h5_path)
 
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=is_train,)
+        dataloader = BlockDataLoader(
+            dataset, batch_size=self.batch_size, shuffle=is_train,block_size=10000 , n_workers=10)
         
         return dataloader
 
@@ -186,12 +189,16 @@ class Drug():
 
     def train_model(self):
         
+        # self.load_data()
         self.load_data()
+        self.create_model_and_optimizer()
         for epoch in range(self.start_epoch, self.end_epoch):
             self.current_epoch = epoch
-            print(f"Start Training Epoch number {epoch}")
+            # print(f"Start Training Epoch number {epoch}")
             training_loss = self.run_one_train_epoch()
             validation_loss = self.run_one_validation_epoch()
+            # validation_loss = 0
+            print(f"EPOCH Train Loss : {training_loss}  \n  EPOCH Validation Loss : {validation_loss}")
             
             self.write_train_log(training_loss=training_loss ,validation_loss=validation_loss , lr=self.current_lr , epoch=epoch )
             
@@ -252,7 +259,7 @@ class Drug():
 
             step_loss = self.calculate_loss(
                 model_output=model_output, target_output=target_output)
-
+            # print(step_loss)
             train_loss_tensor[batch_index] = step_loss
 
             pbar.set_postfix_str(f"Loss: {step_loss:.4f}")
@@ -271,7 +278,6 @@ class Drug():
             pbar.update(1)
 
         epoch_loss = torch.mean(train_loss_tensor)
-        
         return epoch_loss
 
     def generate(self, n_samples):
